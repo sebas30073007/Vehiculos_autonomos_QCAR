@@ -1,12 +1,13 @@
-title: Just the Docs Template
-description: A starter template for a Jeykll site using the Just the Docs theme!
+title: Vehiculos Autonomos QCAR
+description: Documentación del proyecto QCAR usando Just the Docs
+
 remote_theme: just-the-docs/just-the-docs
 
 plugins:
   - jekyll-remote-theme
 
-
-url: https://just-the-docs.github.io
+url: "https://sebas30073007.github.io"
+baseurl: "/Vehiculos_autonomos_QCAR"
 
 aux_links:
-  Template Repository: https://github.com/just-the-docs/just-the-docs-template
+  GitHub Repository: https://github.com/sebas30073007/Vehiculos_autonomos_QCAR
