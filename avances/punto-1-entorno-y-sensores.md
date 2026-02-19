@@ -1,7 +1,7 @@
 ---
 title: Punto 1 — Exploración del entorno y sensores (Virtual + QCar real)
 parent: Avances
-nav_order: 1
+nav_order: 2
 ---
 
 # Punto 1 — Exploración del entorno y sensores (Virtual + QCar real)
