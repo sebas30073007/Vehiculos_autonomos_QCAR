@@ -60,186 +60,148 @@ Se considera completado el Punto 1 cuando:
 
 ## 4) Setup (Virtual)
 
-### 4.1 Checklist de prerequisitos
+Texto completo — Obtención correcta de sensores (QCar2 Virtual)
 
-- MATLAB/Simulink instalados (versión del curso/lab).
-- QLabs con escena de Quanser City disponible.
-- QUARC configurado para ejecución en External Mode.
-- Permisos para correr scripts y lanzar RT models.
+Para obtener correctamente las mediciones de los sensores del QCar2 en el entorno virtual, primero se aseguró que el sistema completo estuviera ejecutándose en el modo correcto (QUARC / tiempo real), y después se instrumentaron los sensores uno por uno verificando que cada señal estuviera “viva”, que fuera coherente con el movimiento del vehículo y que no provocara errores de compilación por el tipo de dato o por el tamaño de las señales.
 
-### 4.2 Flujo sugerido (alto nivel)
+## 1) Arranque correcto del entorno (QLabs + mapa + QCar)
 
-1. Ejecutar script de mapa/escena y spawn del QCar.
-2. Realizar calibración inicial en spot de calibración.
-3. Reposicionar al taxi hub (zona de navegación).
-4. Cargar parámetros globales (timings, LiDAR, control, filtros).
-5. Ejecutar el modelo principal del stack y proceder con instrumentación sensorial.
+El primer paso fue preparar QLabs y el mapa de competencia. Para esto se utilizó el archivo setup_competition_map.m, que se encarga de abrir conexión con QLabs, limpiar actores previos, spawnear el piso y muros del mapa, crear cámaras y finalmente spawnear el QCar2. Ese script también inicia el RT model necesario para que el stack pueda correr con QUARC.
 
----
+La lógica de arranque se hizo en dos fases:
 
-## 5) Secuencia completa de arranque del entorno (paso a paso)
+Fase de calibración: se pone spawn_location = 1, se corre setup_competition_map.m y se spawnea el QCar en la zona de calibración.
 
-### 5.1 `setup_competition_map.m` (mapa, QLabs, spawn, RT model)
+Fase de navegación: después, se cambia spawn_location = 2, se corre otra vez el mismo script, y el QCar aparece en la zona del taxi hub (que es donde realmente se quiere operar el stack del reto).
 
-El script `setup_competition_map.m` se utilizó para:
+Esto es importante porque si no se spawnea en el lugar correcto o si no se inicia el RT model, Simulink puede abrir pero los sensores no entregan datos reales.
 
-- Conectar a QLabs.
-- Limpiar actores previos (`destroy_all_spawned_actors`).
-- Spawnear flooring, muros y cámaras.
-- Spawnear el QCar2 con una ubicación definida por `spawn_location`.
-- Lanzar el RT model asociado (`quarc_run ... QCar2_Workspace_studio.rt-win64`).
+## 2) Calibración previa y verificación base
 
-**Código utilizado (fragmento relevante):**
+Con el spawn_location = 1, se ejecutó el modelo virtual_calibrate.slx. Esta corrida corta sirve para confirmar que los sistemas están bien alineados, en especial el LiDAR y su relación con frames de referencia del mapa. En esta etapa también se confirmó que QLabs realmente estaba corriendo y que el vehículo estaba activo (no congelado).
 
-```matlab
-%% Configurable Params
+Después de esa calibración, se volvió al script de competencia y se cambió el spawn a la ubicación de taxi hub.
 
-% Choose spawn location of QCar
-% 1 => calibration location
-% 2 => taxi hub area
-spawn_location = 2;
+## 3) Carga de parámetros globales (setup_QCar_params)
 
-%% Set up QLabs Connection and Variables
+Antes de instrumentar sensores dentro del stack, se ejecutó el script setup_QCar_params (o equivalente Setup_QCar2_Params). Este paso es clave porque ahí se definen:
 
-newPathEntry = fullfile(getenv('QAL_DIR'), '0_libraries', 'matlab', 'qvl');
-pathCell = regexp(path, pathsep, 'split');
-if ispc
-  onPath = any(strcmpi(newPathEntry, pathCell));
-else
-  onPath = any(strcmp(newPathEntry, pathCell));
-end
-if onPath == 0
-    path(path, newPathEntry)
-    savepath
-end
+Tiempos de muestreo de cada subsistema (controller, LiDAR, RealSense, etc.).
 
-% Stop RT models
-try
-    qc_stop_model('tcpip://localhost:17000', 'QCar2_Workspace')
-catch error
-end
-pause(1)
+Tamaño del scan del LiDAR (SPR_qcar2).
 
-try
-    qc_stop_model('tcpip://localhost:17000', 'QCar2_Workspace_studio')
-    pause(1)
-catch error
-end
-pause(1)
+Rotaciones de calibración (por ejemplo offsets virtual-to-physical y map frame).
 
-% QLab connection
-qlabs = QuanserInteractiveLabs();
-connection_established = qlabs.open('localhost');
+Parámetros de control PD para dirección.
 
-if connection_established == false
-    disp("Failed to open connection.")
-    return
-end
-disp('Connected')
-verbose = true;
-num_destroyed = qlabs.destroy_all_spawned_actors();
+Parámetros del KF / EKF.
 
-%World Objects
-x_offset = 0.13;
-y_offset = 1.67;
-hFloor = QLabsQCarFlooring(qlabs);
-hFloor.spawn_degrees([x_offset, y_offset, 0.001],[0, 0, -90]);
+Carga de archivos de calibración de ángulos y distancias del LiDAR (matfiles).
 
-%region: Walls
-hWall = QLabsWalls(qlabs);
-hWall.set_enable_dynamics(false);
+Carga y visualización de paths SDCS.
 
-for y = 0:4
-    hWall.spawn_degrees([-2.4 + x_offset, (-y*1.0)+2.55 + y_offset, 0.001], [0, 0, 0]);
-end
+Si este script no se corre antes de ejecutar el modelo principal, aparecen errores de variables no definidas o el stack funciona pero de forma inconsistente.
 
-for x = 0:4
-    hWall.spawn_degrees([-1.9+x + x_offset, 3.05+ y_offset, 0.001], [0, 0, 90]);
-end
+## 4) Ejecución del modelo principal (virtual_self_driving_stack_v2)
 
-for y = 0:5
-    hWall.spawn_degrees([2.4+ x_offset, (-y*1.0)+2.55 + y_offset, 0.001], [0, 0, 0]);
-end
+Con QLabs corriendo, el QCar spawneado correctamente y los parámetros cargados, se abrió y ejecutó el modelo principal virtual_self_driving_stack_v2. Aquí hubo una consideración crítica: no se puede correr en “Run normal”, porque el modelo tiene bloques tipo HIL Initialize. Por seguridad, QUARC bloquea el acceso a ese hardware/RT en modo normal, así que el modo correcto fue correr siempre en:
 
-for x = 0:3
-    hWall.spawn_degrees([-0.9+x+ x_offset, -3.05+ y_offset, 0.001], [0, 0, 90]);
-end
+Monitor & Tune (External Mode)
 
-hWall.spawn_degrees([-2.03 + x_offset, -2.275+ y_offset, 0.001], [0, 0, 48]);
-hWall.spawn_degrees([-1.575+ x_offset, -2.7+ y_offset, 0.001], [0, 0, 48]);
+Ese fue el modo que permitió que las señales fueran entregadas de forma continua y en tiempo real.
 
-%spawn cameras
-camera1Loc = [0.15, 1.7, 5];
-camera1Rot = [0, 90, 0];
-camera1 = QLabsFreeCamera(qlabs);
-camera1.spawn_degrees(camera1Loc, camera1Rot);
-camera1.possess();
+## 5) Instrumentación del LiDAR: cómo se logró que midiera sin errores
 
-camera2Loc = [-0.36+ x_offset, -3.691+ y_offset, 2.652];
-camera2Rot = [0, 47, 90];
-camera2=QLabsFreeCamera(qlabs);
-camera2.spawn_degrees (camera2Loc, camera2Rot);
+El LiDAR fue el sensor más importante y también el que más problemas puede causar si se instrumenta mal.
 
-%% Spawn QCar 2 and start rt model
+Primero se validó el flag de nueva lectura:
 
-calibration_location_rotation = [0, 2.13, 0.005, 0, 0, -90];
-taxi_hub_location_rotation = [-1.205, -0.83, 0.005, 0, 0, -44.7];
+lidarNewReading se conectó a un Scope en modo stairs.
 
-myCar = QLabsQCar2(qlabs);
+Cuando la señal da pulsos o se mantiene actualizando en 1, se confirma que sí están llegando nuevos scans.
 
-switch spawn_location
-    case 1
-        spawn = calibration_location_rotation;
-    case 2
-        spawn = taxi_hub_location_rotation;
-end
+Después vino el problema principal: lidarDistances sale como señal de tamaño variable ([var]). Por eso cuando se intentó usar bloques como Saturation o MinMax directamente, Simulink marcaba error de “fixed-size expected”.
 
-myCar.spawn_id_degrees(0, spawn(1:3), spawn(4:6), [1/10, 1/10, 1/10], 1);
+La solución fue no usar esos bloques estándar y en su lugar procesar el scan con una MATLAB Function robusta y compatible con variable-size. Esa función filtra inválidos (NaN/Inf y rangos fuera de operación) y calcula:
 
-% Start RT models
-file_workspace = fullfile(getenv('RTMODELS_DIR'), 'QCar2', 'QCar2_Workspace_studio.rt-win64');
-pause(2)
-system(['quarc_run -D -r -t tcpip://localhost:17000 ', file_workspace]);
-pause(3)
+dmin: la distancia mínima válida
 
-qlabs.close()
+angMin: el ángulo donde ocurre esa distancia mínima
 
-Este archivo define:
+Con eso, el scan de 1000 puntos se convirtió en dos señales escalares estables que se podían visualizar con Display o Scope sin volver a romper el modelo.
 
-1) Tiempos de muestreo (controller, LiDAR, RealSense, etc.).
+Además, se explicó y validó qué significa lidarHeading: cada distancia tiene un ángulo asociado, así que al obtener el índice del mínimo también se obtiene la dirección del obstáculo más cercano.
 
-2) Tamaño de captura del LiDAR (SPR).
+## 6) Instrumentación de IMU y odometría (cinemática)
 
-3) Calibraciones angulares del LiDAR (virtual-to-physical, map rotation).
+Una vez que el LiDAR estaba estable, se pasó a señales cinemáticas:
 
-4) Control PD de dirección (virtual/physical).
+measuredSpeed para velocidad lineal
 
-5) Parametrización de KF/EKF.
+gyro (rad/s) para giro
 
-6) Carga de calibraciones (distance_new_qcar2.mat, angles_new_qcar2.mat).
+Se conectaron ambos a scopes normales, con rangos manuales para que fuera legible. Se validó coherencia física:
 
-7) Carga y visualización de rutas SDCS.
+Si el vehículo acelera, la velocidad sube.
 
-## Instrumentación y validación de sensores (Simulink)
+Si el vehículo gira, el gyro cambia.
 
-Una vez ejecutado el modelo principal virtual_self_driving_stack_v2, se instrumentaron los sensores con Scopes, displays y MATLAB Function. La meta fue construir sanity checks por sensor (coherencia de unidades y magnitudes) y asegurar estabilidad en tiempo real.
+No hay saltos raros o discontinuidades.
 
-6.1 LiDAR — medición de obstáculo más cercano (dmin, angMin)
+## 7) Instrumentación de pose (estado estimado)
 
-Señales usadas
+Después se buscó y validó el estado [x, y, heading] que el stack calcula, usando:
 
-lidarDistances (m) — vector
+lidarPose como salida de localización por LiDAR
 
-lidarHeadings (rad) — vector
+currentPose como la pose estimada final (fusión/estado)
 
-lidarNewReading (bool) — “nuevo scan”
+Para visualizarlo se usó Scope con “Elements as channels” o se separó con un Demux(3). Con esto se observó que:
 
-Validación de adquisición
+x e y cambian suave conforme el coche se mueve
 
-lidarNewReading se conectó a un Scope en modo stairs para confirmar llegada de nuevos frames.
+heading cambia cuando gira
 
-[INSERTAR CAPTURA AQUÍ — Scope de lidarNewReading (stairs)]
+Esto confirmó que la estimación de estado está viva y usable para control.
 
-Problema detectado: señales de tamaño variable
+## 8) Telemetría eléctrica (sensores internos del sistema)
 
-lidarDistances aparece como [var], lo que genera fallos si se usan bloques que requieren tamaño fijo (por ejemplo Saturation/MinMax). Para evitar esto, se calculó el mínimo mediante un MATLAB Function robusto y compatible con variable-size.
+Finalmente se instrumentaron señales internas del QCar:
+
+batteryVoltage
+
+motorCurrent
+
+batteryLevel
+
+motorPower
+
+Se pusieron en un Scope 2×2 y se asignaron rangos manuales. Se verificó que corriente y potencia suban cuando hay aceleración, y que los valores sean plausibles (sin negativos raros).
+
+## 9) Cámara (Depth/RGB): intento y decisión
+
+Se intentó activar la captura de cámara con Video3D. Aquí se detectó un problema fuerte:
+
+En External Mode apareció el error “video format is not supported”.
+
+Se concluyó que la configuración actual del pipeline Video3D no es compatible con External Mode bajo ese formato (por tamaño, fps o tipo). Dado que el objetivo era instrumentar el stack sensorial sin romper ejecución, se tomó la decisión técnica de:
+
+Posponer cámara
+
+Priorizar LiDAR + pose + cinemática, que ya era suficiente para avanzar con navegación.
+
+Resultado final
+
+Después de este proceso, el stack sensorial quedó funcionando con:
+
+LiDAR midiendo y entregando dmin/angMin sin errores por variable-size
+
+IMU y odometría coherentes
+
+Pose estimada viva (currentPose)
+
+Telemetría eléctrica monitoreada
+
+Cámara documentada como limitación (por ahora)
+
+Y lo más importante: se dejó un flujo reproducible para que cualquier integrante del equipo pueda volver a levantar el entorno, correr el setup, lanzar el stack y validar sensores en tiempo real sin “prueba y error”.
