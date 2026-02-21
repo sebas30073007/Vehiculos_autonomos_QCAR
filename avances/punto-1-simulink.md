@@ -219,3 +219,27 @@ Este archivo define:
 6) Carga de calibraciones (distance_new_qcar2.mat, angles_new_qcar2.mat).
 
 7) Carga y visualización de rutas SDCS.
+
+## Instrumentación y validación de sensores (Simulink)
+
+Una vez ejecutado el modelo principal virtual_self_driving_stack_v2, se instrumentaron los sensores con Scopes, displays y MATLAB Function. La meta fue construir sanity checks por sensor (coherencia de unidades y magnitudes) y asegurar estabilidad en tiempo real.
+
+6.1 LiDAR — medición de obstáculo más cercano (dmin, angMin)
+
+Señales usadas
+
+lidarDistances (m) — vector
+
+lidarHeadings (rad) — vector
+
+lidarNewReading (bool) — “nuevo scan”
+
+Validación de adquisición
+
+lidarNewReading se conectó a un Scope en modo stairs para confirmar llegada de nuevos frames.
+
+[INSERTAR CAPTURA AQUÍ — Scope de lidarNewReading (stairs)]
+
+Problema detectado: señales de tamaño variable
+
+lidarDistances aparece como [var], lo que genera fallos si se usan bloques que requieren tamaño fijo (por ejemplo Saturation/MinMax). Para evitar esto, se calculó el mínimo mediante un MATLAB Function robusto y compatible con variable-size.
