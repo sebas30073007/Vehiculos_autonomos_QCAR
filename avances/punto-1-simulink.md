@@ -1,5 +1,5 @@
 ---
-title: Punto 2 — Exploración del entorno y sensores (Matlab + Simulink + QCar Virtual)
+title: Punto 1 — Exploración del entorno y sensores (Virtual + QCar real)
 parent: Avances
 nav_order: 1
 ---
@@ -51,171 +51,210 @@ Finalmente, se abre el modelo principal de Simulink. Este modelo integra:
 * **Decisión:** Lógica de seguimiento de carril o evasión.
 * **Actuación:** Bloques de escritura que envían comandos de aceleración y ángulo de dirección al simulador.
 
-## Punto 1 — Exploración del entorno y sensores (Virtual + QCar real)
+## 6. Instrumentación y validación integral de sensores
 
-1) Resumen ejecutivo
+Con el entorno virtual correctamente configurado y el modelo ejecutándose en modo **Monitor & Tune (External Mode)**, se procedió a instrumentar y validar cada uno de los sensores disponibles en el QCar2 virtual.
 
-En este Punto 1 se realizó la instrumentación y validación completa de los sensores del QCar2 en entorno virtual utilizando MATLAB/Simulink junto con QLabs y ejecución en modo QUARC (Monitor & Tune).
+El objetivo de esta fase no fue implementar aún la lógica de navegación autónoma, sino garantizar que:
 
-El objetivo principal no fue implementar aún el algoritmo final de conducción autónoma, sino garantizar que el sistema sensorial del vehículo funciona correctamente, que las señales son coherentes con el movimiento del entorno virtual y que el modelo puede ejecutarse en tiempo real sin errores estructurales.
+- Las señales se reciben correctamente.
+- No existen errores estructurales en el modelo.
+- Las magnitudes físicas son coherentes.
+- Las unidades están correctamente interpretadas.
+- El sistema es estable en tiempo real.
 
-Se validaron los siguientes sistemas:
+Esta validación constituye la base sobre la cual se construirá el sistema de percepción y control.
 
-- LiDAR (detección de obstáculos)
-- IMU (velocidad angular)
-- Odometría (velocidad lineal)
-- Estimación de pose (posición y orientación del vehículo)
-- Telemetría eléctrica (estado interno del sistema)
-- Intento de integración de cámara (Depth/RGB)
+---
 
-El resultado fue un stack virtual estable, completamente instrumentado y listo para avanzar hacia control y navegación.
+### 6.1 Validación del sistema LiDAR
 
-2) Contexto técnico de ejecución
+#### Señales analizadas
 
-El modelo contiene bloques tipo HIL Initialize, lo que implica que no puede ejecutarse en modo Run normal.
+- `lidarDistances` → vector de distancias (m)
+- `lidarHeadings` → vector de ángulos correspondientes (rad)
+- `lidarNewReading` → bandera booleana de nueva lectura
 
-Por esta razón, toda la validación se realizó en modo Monitor & Tune (External Mode), lo cual permite:
+#### Confirmación de adquisición
 
-- Comunicación determinista con el entorno virtual.
-- Actualización en tiempo real de señales.
-- Visualización continua mediante Scopes.
+Se conectó `lidarNewReading` a un Scope configurado en modo tipo *stairs*.  
+La presencia de pulsos periódicos confirmó la correcta recepción de barridos completos del sensor.
 
-Este detalle es importante porque explica por qué ciertos errores aparecían al intentar correr el modelo en modo normal.
+#### Problema detectado: señal de tamaño variable
 
-3) Validación del LiDAR
-3.1 Señales utilizadas
+La señal `lidarDistances` se identifica como `[var]`, es decir, de tamaño variable.  
+Esto generaba errores al utilizar bloques como `Saturation` o `MinMax`, ya que estos requieren señales de tamaño fijo en External Mode.
 
-Se trabajó con las siguientes señales:
+#### Solución implementada
 
-- lidarDistances → vector de distancias medidas.
-- lidarHeadings → vector de ángulos asociados a cada medición.
-- lidarNewReading → bandera booleana que indica llegada de un nuevo barrido.
+Se desarrolló una función MATLAB personalizada que:
 
-3.2 Confirmación de funcionamiento
+- Convierte el vector a formato columna.
+- Filtra valores inválidos (`NaN`, `Inf`, fuera de rango útil).
+- Calcula la distancia mínima únicamente sobre valores válidos.
 
-Se conectó lidarNewReading a un Scope en modo tipo escalón (stairs).
-La presencia de pulsos confirmó que el sensor estaba generando lecturas activamente.
+Esto permitió obtener una variable escalar `dmin` robusta y compatible con ejecución en tiempo real.
 
-3.3 Problema detectado: tamaño variable
+Adicionalmente, se calculó el ángulo correspondiente al obstáculo más cercano utilizando `lidarHeadings`, permitiendo determinar no solo proximidad, sino dirección del obstáculo.
 
-La señal lidarDistances aparece como variable-size ([var]).
+#### Resultado
 
-Bloques como Saturation o MinMax requieren tamaño fijo, lo que generaba errores de compilación en External Mode.
+El LiDAR quedó completamente funcional, permitiendo:
 
-3.4 Solución implementada
+- Detección reactiva de obstáculos.
+- Extracción de métricas simplificadas (mínimo, dirección).
+- Base para futuras estrategias de evasión.
 
-Se reemplazó la lógica de mínimo por una función MATLAB robusta que:
+---
 
-- Convierte el vector a columna.
-- Filtra valores inválidos (NaN, infinito o fuera de rango).
-- Calcula el mínimo solo sobre valores válidos.
+**[INSERTAR CAPTURA AQUÍ — Scope de lidarNewReading]**
 
-Esto permitió calcular la distancia mínima (dmin) sin errores.
+**[INSERTAR CAPTURA AQUÍ — Gráfica de distancia mínima en tiempo real]**
 
-Además, se implementó el cálculo del ángulo correspondiente (angMin), lo que permite conocer no solo qué tan cerca está un obstáculo, sino en qué dirección se encuentra.
+**[INSERTAR CAPTURA AQUÍ — Visualización del ángulo del obstáculo más cercano]**
 
-Resultado: LiDAR completamente funcional y usable para navegación reactiva.
+---
 
-4) Validación de IMU y Odometría
-4.1 Señales instrumentadas
+### 6.2 Validación de IMU y cinemática
 
-measuredSpeed (velocidad lineal del vehículo)
+#### Señales instrumentadas
 
-gyro (velocidad angular en yaw)
+- `measuredSpeed` (m/s)
+- `gyro` (rad/s)
 
-Estas señales se conectaron a Scopes normales con rango manual definido para evitar autoescala inestable.
+#### Configuración
 
-4.2 Validación física
+Se conectaron a Scopes independientes con límites manuales definidos para evitar autoescalado inestable:
+
+- Velocidad: 0 a 5 m/s
+- Velocidad angular (yaw): −3 a 3 rad/s
+
+#### Validación física
 
 Se verificó que:
 
- - Cuando el vehículo acelera, measuredSpeed aumenta.
- - Cuando el vehículo gira, el gyro refleja velocidad angular coherente.
- - No existen saltos abruptos o discontinuidades artificiales.
+- Al acelerar, la velocidad lineal aumenta de forma suave.
+- Durante giros, el giroscopio refleja cambios coherentes en la orientación.
+- No existen discontinuidades abruptas o valores físicamente imposibles.
 
-Resultado: cinemática consistente con el movimiento observado en QLabs.
+#### Resultado
 
-5) Estimación de pose
-5.1 Señales identificadas
+La dinámica del vehículo virtual es consistente con las señales cinemáticas, lo que confirma correcta integración entre el modelo dinámico y los sensores.
 
-lidarPose [x, y, heading]
+---
 
-currentPose [x, y, heading]
+**[INSERTAR CAPTURA AQUÍ — Scope de velocidad lineal]**
 
-Estas representan la estimación de estado del vehículo.
+**[INSERTAR CAPTURA AQUÍ — Scope de velocidad angular (gyro)]**
 
-5.2 Método de visualización
+---
 
-Se utilizaron dos enfoques:
+### 6.3 Estimación de pose y estado del vehículo
 
-- Scope con “Elements as channels”
-- Demux(3) para separar x, y y heading
+#### Señales analizadas
 
-Se configuró el rango del heading entre aproximadamente -3.2 y 3.2 rad (±π).
+- `lidarPose [x, y, heading]`
+- `currentPose [x, y, heading]`
 
-5.3 Validación
+Estas señales representan la estimación del estado completo del vehículo en el plano.
+
+#### Método de visualización
+
+Se emplearon dos estrategias:
+
+1. Scope con opción “Elements as channels”.
+2. Bloque Demux(3) para separar:
+   - x (posición longitudinal)
+   - y (posición lateral)
+   - heading (orientación)
+
+El rango angular se configuró entre −π y π rad para mantener coherencia física.
+
+#### Validación
 
 Se observó que:
 
-- x e y cambian suavemente conforme el vehículo se desplaza.
-- heading varía coherentemente con los giros.
-- No hay saltos erráticos.
+- x e y evolucionan suavemente durante el desplazamiento.
+- heading cambia progresivamente durante giros.
+- No existen saltos erráticos o discontinuidades no físicas.
 
-Resultado: la estimación de estado es estable y consistente.
+#### Resultado
 
-6) Telemetría eléctrica
+El estado del vehículo es observable en tiempo real, lo que habilita integración futura con controladores basados en estado.
 
-Se instrumentaron las siguientes señales internas del vehículo:
+---
 
-- batteryVoltage
-- motorCurrent
-- batteryLevel
-- motorPower
+**[INSERTAR CAPTURA AQUÍ — Scope de posición X y Y]**
 
-Se utilizó un Scope 2×2 para visualización simultánea.
+**[INSERTAR CAPTURA AQUÍ — Scope de heading]**
 
-Validaciones realizadas
+---
 
- - El voltaje permanece dentro de rango lógico.
- - La corriente aumenta cuando el vehículo acelera.
- - La potencia se correlaciona con la demanda dinámica.
- - No existen valores negativos físicamente imposibles.
+### 6.4 Monitoreo de telemetría eléctrica
 
-Resultado: monitoreo energético operativo y coherente.
+#### Señales instrumentadas
 
-7) Intento de integración de cámara
+- `batteryVoltage`
+- `motorCurrent`
+- `batteryLevel`
+- `motorPower`
 
-Se intentó activar el bloque Video3D Capture para Depth/RGB.
+#### Configuración
 
-Problema observado:
-En External Mode aparece el error “video format is not supported”.
+Se utilizó un Scope con distribución 2×2 para monitoreo simultáneo.
 
-Interpretación técnica:
+Rangos definidos:
 
-El pipeline Video3D no es completamente compatible con la configuración actual de External Mode, probablemente por formato de datos o resolución.
+- Voltaje: 0–16 V
+- Corriente: 0–30 A
+- Nivel de batería: 0–100 %
+- Potencia: 0–300 W
 
-Decisión tomada:
+#### Validación
 
-Posponer la integración de cámara.
+Se verificó que:
 
-Priorizar LiDAR + odometría + pose para garantizar estabilidad del sistema.
+- La corriente aumenta bajo aceleración.
+- La potencia se correlaciona con la demanda dinámica.
+- El voltaje se mantiene dentro de rango estable.
+- No aparecen valores negativos físicamente imposibles.
 
-8) Problemas encontrados y soluciones aplicadas
+#### Resultado
 
- - Error en Run normal → ejecutar en Monitor & Tune.
- - Error en bloques de tamaño fijo → usar MATLAB Function robusta.
- - Error en Video3D → posponer integración.
- - Escalas incorrectas en Scope → definir límites manuales.
+La telemetría eléctrica es consistente y permite evaluar el consumo energético en función de la maniobra.
 
-9) Estado final del Punto 1
+---
 
-Al finalizar esta fase:
+**[INSERTAR CAPTURA AQUÍ — Scope 2×2 de telemetría eléctrica]**
 
- - LiDAR entrega datos válidos y procesables.
- - IMU y velocidad son coherentes.
- - Pose estimada es estable.
- - Telemetría eléctrica funciona correctamente.
+---
 
-Se documentó la limitación del módulo de cámara.
+### 6.5 Intento de integración de cámara Depth/RGB
 
-El stack virtual se encuentra completamente instrumentado a nivel sensorial y listo para avanzar hacia control y navegación autónoma.
+Se intentó habilitar el bloque `Video3D Capture` para obtener imágenes RGB y mapa de profundidad.
+
+En ejecución en External Mode apareció el error:
+
+> "video format is not supported"
+
+Esto indica incompatibilidad entre el formato del dispositivo virtual y el modo de ejecución en tiempo real.
+
+#### Decisión técnica
+
+- Priorizar sensores críticos para navegación (LiDAR, pose, odometría).
+- Posponer integración de cámara hasta estabilizar configuración o evaluar modo alternativo.
+
+---
+
+## 7. Estado técnico al cierre del Punto 1
+
+Al finalizar esta etapa se logró:
+
+- Confirmar recepción estable del LiDAR.
+- Resolver errores por señales de tamaño variable.
+- Validar coherencia cinemática (velocidad y giro).
+- Observar el estado completo del vehículo en tiempo real.
+- Monitorear variables eléctricas internas.
+- Identificar limitaciones del módulo de cámara en External Mode.
+
+El sistema sensorial virtual se encuentra completamente instrumentado y estable, constituyendo una base sólida para el desarrollo del módulo de control y navegación autónoma.
