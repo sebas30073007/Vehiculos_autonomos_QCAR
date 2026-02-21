@@ -1,5 +1,5 @@
 ---
-title: Punto 1 — Exploración del entorno y sensores (Virtual + QCar real)
+title: Punto 2 — Exploración del entorno y sensores (Matlab + Simulink + QCar Virtual)
 parent: Avances
 nav_order: 1
 ---
