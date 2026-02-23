@@ -18,7 +18,7 @@ Se validaron los siguientes componentes:
 - **Telemetría eléctrica** (voltaje, corriente, nivel y potencia).
 - Se intentó integrar **cámara Depth/RGB** (Video3D), documentando la limitación observada en External Mode.
 
-Como resultado tangible, este avance entrega: (i) una secuencia reproducible de arranque del entorno, (ii) instrumentación por sensor con evidencias, (iii) funciones MATLAB robustas para señales LiDAR de tamaño variable y (iv) criterios mínimos de validación para que el equipo replique las pruebas sin depender de “memoria informal”.
+Como resultado tangible, este avance entrega: (i) una secuencia reproducible de arranque del entorno, (ii) instrumentación por sensor con evidencias, (iii) una MATLAB Function robusta para LiDAR con señales de tamaño variable y (iv) criterios mínimos de validación para que el equipo replique las pruebas sin depender de “memoria informal”.
 
 ---
 
@@ -47,6 +47,7 @@ El contexto de la CPS-IoT 2026 exige resolver conducción tipo **taxi autónomo 
 - Capturas de QLabs (entorno + posición del QCar).
 - Capturas de Simulink (bloques de sensores, MATLAB Function, Scopes).
 - Lista de incidencias y decisión técnica (cámara).
+- MATLAB Function del LiDAR utilizada para obtener `dmin` y `angMin`.
 
 ### Definition of Done (DoD)
 
@@ -116,16 +117,28 @@ Con QLabs corriendo, el QCar spawneado correctamente y parámetros globales carg
 
 El LiDAR fue el sensor más crítico y el que más restricciones impone por el manejo de señales **variable-size**.
 
-1) **Validación de nueva lectura**  
+### 9.1 Señales instrumentadas
+
+- `lidarDistances [var] (m)`
+- `lidarHeadings [var] (rad)`
+- `lidarNewReading [1] (bool)`
+- (Salida procesada) `dmin`, `angMin`
+
+### 9.2 Validación de nueva lectura
+
 - `lidarNewReading` se conectó a un Scope (*stairs*) para confirmar adquisición en tiempo real.
 
-2) **Problema principal**  
-- `lidarDistances` y `lidarHeading` salen como señales de tamaño variable (`[var]`), y al usar bloques estándar (p. ej. MinMax) puede aparecer el error *“fixed-size expected”*.
+### 9.3 Problema principal (variable-size)
 
-3) **Solución aplicada (robusta)**  
-- Se procesó el scan mediante una **MATLAB Function** compatible con variable-size, filtrando inválidos (`NaN/Inf` y rangos fuera de operación) y calculando:
-  - `dmin`: distancia mínima válida  
-  - `angMin`: ángulo asociado al mínimo
+- `lidarDistances` y `lidarHeadings` salen como señales de tamaño variable (`[var]`).
+- Bloques estándar (p. ej. MinMax, Saturation) pueden fallar con errores tipo *“fixed-size expected”*.
+
+### 9.4 Solución aplicada (MATLAB Function robusta)
+
+Se procesó el scan mediante una **MATLAB Function** compatible con variable-size, filtrando inválidos (`NaN/Inf` y rangos fuera de operación) y calculando:
+
+- `dmin`: distancia mínima válida  
+- `angMin`: ángulo asociado al mínimo
 
 ![Subbloque LiDAR — captura y offsets de frame]({{ "/assets/images/lidarCapture.png" | relative_url }})
 *Bloque de captura/procesamiento de LiDAR y ajustes de offsets/frames.*
@@ -142,13 +155,17 @@ El LiDAR fue el sensor más crítico y el que más restricciones impone por el m
 
 Una vez estable el LiDAR, se instrumentaron señales cinemáticas:
 
-- `measuredSpeed` (velocidad lineal)  
-- `gyro` (rad/s)
+- `measuredSpeed` (m/s)  
+- `gyro` (rad/s)  
+- (opcional) acelerómetro (m/s²) si está disponible en el modelo
 
 Se validó coherencia física:
 - si el vehículo acelera → `measuredSpeed` sube  
 - si el vehículo gira → `gyro` cambia  
 - no hay discontinuidades raras
+
+![Velocidad medida — `measuredSpeed` (m/s)]({{ "/assets/images/speedQCar.png" | relative_url }})
+*Scope de velocidad (`measuredSpeed`) mostrando variación coherente durante la corrida.*
 
 ![IMU / acelerómetro — validación temporal]({{ "/assets/images/IMU.png" | relative_url }})
 *Scope del acelerómetro/IMU para ver estabilidad y coherencia de magnitudes.*
@@ -172,10 +189,10 @@ Sanity checks:
 
 Finalmente se instrumentaron señales internas del QCar:
 
-- `batteryVoltage`
-- `motorCurrent`
-- `batteryLevel`
-- `motorPower`
+- `batteryVoltage` (V)
+- `motorCurrent` (A)
+- `batteryLevel` (%)
+- `motorPower` (W)
 
 Se organizó la visualización en un Scope 2×2 y se asignaron rangos manuales para que fuera legible. Se verificó que corriente/potencia suban al acelerar y que los valores sean plausibles.
 
@@ -186,7 +203,7 @@ Se organizó la visualización en un Scope 2×2 y se asignaron rangos manuales p
 
 ## 13) Evidencia de mapa / trayectoria (visualización 2D)
 
-Como evidencia adicional de consistencia global (pose + entorno), se generó una visualización 2D en MATLAB/figura donde se aprecia el trazo del vehículo respecto al mapa.
+Como evidencia adicional de consistencia global (pose + entorno), se generó una visualización 2D en MATLAB donde se aprecia el trazo del vehículo respecto al mapa.
 
 ![Ruta trazada — evidencia de consistencia global]({{ "/assets/images/rutaTrazada.png" | relative_url }})
 *Figura 2D de trayectoria / referencia del entorno para validar consistencia espacial.*
@@ -204,9 +221,6 @@ Conclusión: la configuración actual del pipeline Video3D no es compatible con 
 - **Posponer cámara**
 - Priorizar **LiDAR + pose + cinemática**, suficientes para avanzar con navegación
 
-![Cámaras 360 - Combined View]({{ "/assets/images/360_camera.png" | relative_url }})
-*Referencia de formato de inclusión de imágenes (si se usa vista combinada).*
-
 ---
 
 ## 15) Resultado final
@@ -214,7 +228,7 @@ Conclusión: la configuración actual del pipeline Video3D no es compatible con 
 Después de este proceso, el stack sensorial quedó funcionando con:
 
 - LiDAR midiendo y entregando `dmin/angMin` sin errores por variable-size
-- IMU y odometría coherentes
+- IMU y odometría coherentes (velocidad y gyro)
 - Pose estimada viva (`currentPose`)
 - Telemetría eléctrica monitoreada
 - Cámara documentada como limitación (por ahora)
@@ -225,14 +239,21 @@ Y lo más importante: se dejó un flujo **reproducible** para que cualquier inte
 
 ## 16) Anexos
 
-### 16.1 Estructura sugerida de evidencia
+### 16.1 MATLAB Function utilizada para el LiDAR (`nearestObstacle`)
 
-```text
-/avances/punto-1-virtual/
-  ├── capturas_qlabs/
-  ├── capturas_simulink/
-  ├── notas_incidencias.md
-  └── scripts/
-      ├── setup_competition_map.m
-      ├── setup_QCar_params.m
-      └── funciones_lidar/
+```matlab
+function [dmin, angMin] = nearestObstacle(dist, ang)
+dist = dist(:); ang = ang(:);
+
+valid = isfinite(dist) & dist > 0.05 & dist < 12 & isfinite(ang);
+
+if any(valid)
+    dv = dist(valid);
+    av = ang(valid);
+    [dmin, k] = min(dv);
+    angMin = av(k);
+else
+    dmin = NaN;
+    angMin = NaN;
+end
+end
