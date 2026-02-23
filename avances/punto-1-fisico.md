@@ -50,7 +50,7 @@ Se considera completado el Punto 1 cuando:
 - Zona segura de prueba, sin obstáculos no controlados.
 - Usuario con permisos para ejecutar scripts, crear carpetas y escribir logs en el sistema del QCar.
 
-![QCar real – setup](/workspaces/Vehiculos_autonomos_QCAR/assets/images/Qcar.jpg)
+![QCar real – setup]({{ "/assets/images/Qcar.jpg" | relative_url }})
 *Vista del hardware del QCar instrumentado sobre la mesa de trabajo, mostrando el LiDAR superior, cámaras y la electrónica expuesta.*
 
 ### Notas de entorno Python
@@ -83,7 +83,7 @@ Confirmar adquisición de sensores sobre el hardware real, visualizar los datos 
 3. Verificar la tasa de refresco (FPS) y la correcta iluminación del entorno.
 4. Asegurar que el timestamp se registra en cada captura guardada.
 
-![Cámaras 360 - Combined View](/workspaces/Vehiculos_autonomos_QCAR/assets/images/360_camera.png)
+![Cámaras 360 - Combined View]({{ "/assets/images/360_camera.png" | relative_url }})
 *Vista combinada de las cámaras del QCar capturando el entorno del laboratorio en 360 grados.*
 
 **B) LiDAR**
@@ -93,7 +93,8 @@ Confirmar adquisición de sensores sobre el hardware real, visualizar los datos 
 3. Generar vista 2D instantánea (proyección XY).
 4. Guardar scan junto con el timestamp unificado del logger.
 
-![Mapa LiDAR 2D](/workspaces/Vehiculos_autonomos_QCAR/assets/images/Lidar.png)
+![Mapa LiDAR 2D]({{ "/assets/images/Lidar.png" | relative_url }})
+
 *Visualización 2D de la nube de puntos del LiDAR detectando la geometría del espacio.*
 
 **C) IMU y Encoders**
