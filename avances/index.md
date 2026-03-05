@@ -6,15 +6,12 @@ nav_order: 2
 
 # Avances
 
-Esta sección funciona como **bitácora técnica** del proyecto *Vehículos Autónomos – QCar*. Aquí se documentan avances replicables (qué se hizo, cómo se hizo, qué se observó y qué faltó por cerrar) para que el equipo pueda auditar decisiones y reutilizar resultados en el flujo del concurso.
+Bitácora técnica del proyecto *QCar Autónomo*. Cada punto del concurso tiene su propia sección con las variantes virtual y físico.
 
-## Contenido actual
-
-- [Punto 1 — Exploración del entorno y sensores (Virtual + QCar real)](./punto-1-entorno-y-sensores)
-
-## Cómo usar esta bitácora
-
-1. Revisar objetivo y alcance del punto.
-2. Replicar setup virtual/físico con los checklists.
-3. Validar evidencia (capturas, plots, logs y metadatos).
-4. Registrar pendientes con `TODO(...)` para evitar supuestos.
+| Punto | Semana | Estado |
+|-------|--------|--------|
+| [Exploración de Sensores](./punto-1-entorno-y-sensores) | S1 · 23 feb – 1 mar | ✓ Completado |
+| [OGM + SLAM](./punto-2-ogm-slam) | S2 · 2 mar – 8 mar | ⚡ Activo |
+| [Navegación](./punto-3-navegacion) | S3 · 9 mar – 15 mar | Pendiente |
+| [Cumplimiento Vial](./punto-4-cumplimiento-vial) | S4 · 16 mar – 22 mar | Pendiente |
+| [Producción](./punto-5-produccion) | S5 · 23 mar – 31 mar | Pendiente |

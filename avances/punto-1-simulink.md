@@ -1,7 +1,8 @@
 ---
-title: Punto 1 — Exploración del entorno y sensores (Virtual)
-parent: Avances
-nav_order: 
+title: "Virtual"
+parent: "Exploración de Sensores"
+grand_parent: Avances
+nav_order: 1
 ---
 
 # Punto 1 — Exploración del entorno y sensores (Virtual)

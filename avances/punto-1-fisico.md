@@ -1,7 +1,8 @@
 ---
-title: Punto 1 — Exploración del entorno y sensores (QCar real)
-parent: Avances
-nav_order: 
+title: "Físico"
+parent: "Exploración de Sensores"
+grand_parent: Avances
+nav_order: 2
 ---
 
 # Punto 1 — Exploración del entorno y sensores (QCar real)

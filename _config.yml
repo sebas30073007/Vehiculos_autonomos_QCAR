@@ -1,4 +1,4 @@
-title: Vehiculos Autonomos QCAR
+title: QCar Autónomo
 description: Documentación del proyecto QCAR usando Just the Docs
 
 remote_theme: just-the-docs/just-the-docs
@@ -11,3 +11,6 @@ baseurl: "/Vehiculos_autonomos_QCAR"
 
 aux_links:
   GitHub Repository: https://github.com/sebas30073007/Vehiculos_autonomos_QCAR
+
+mermaid:
+  version: "9.1.3"
